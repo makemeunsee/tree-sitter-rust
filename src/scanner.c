@@ -1,5 +1,8 @@
 #include <tree_sitter/parser.h>
-#include <wctype.h>
+#include <stddef.h>
+
+typedef int wchar_t;
+typedef unsigned wint_t;
 
 enum TokenType {
   STRING_CONTENT,
@@ -8,12 +11,54 @@ enum TokenType {
   BLOCK_COMMENT,
 };
 
-void *tree_sitter_rust_external_scanner_create() { return NULL; }
+void *tree_sitter_rust_external_scanner_create() { return 0; }
 void tree_sitter_rust_external_scanner_destroy(void *p) {}
 void tree_sitter_rust_external_scanner_reset(void *p) {}
 unsigned tree_sitter_rust_external_scanner_serialize(void *p, char *buffer) { return 0; }
 void tree_sitter_rust_external_scanner_deserialize(void *p, const char *b, unsigned n) {}
 
+static const unsigned char table[] = {
+#include "alpha.h"
+};
+
+static int iswalpha(wint_t wc)
+{
+  if (wc<0x20000U)
+    return (table[table[wc>>8]*32+((wc&255)>>3)]>>(wc&7))&1;
+  if (wc<0x2fffeU)
+    return 1;
+  return 0;
+}
+
+static int iswdigit(wint_t wc)
+{
+  return (unsigned)wc-'0' < 10;
+}
+
+static size_t wcslen(const wchar_t *s)
+{
+  const wchar_t *a;
+  for (a=s; *s; s++);
+  return s-a;
+}
+
+static wchar_t *wcschr(const wchar_t *s, wchar_t c)
+{
+  if (!c) return (wchar_t *)s + wcslen(s);
+  for (; *s && *s != c; s++);
+  return *s ? (wchar_t *)s : 0;
+}
+
+static int iswspace(wint_t wc)
+{
+  static const wchar_t spaces[] = {
+    ' ', '\t', '\n', '\r', 11, 12,  0x0085,
+    0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005,
+    0x2006, 0x2008, 0x2009, 0x200a,
+    0x2028, 0x2029, 0x205f, 0x3000, 0
+  };
+  return wc && wcschr(spaces, wc);
+}
 static void advance(TSLexer *lexer) {
   lexer->advance(lexer, false);
 }
